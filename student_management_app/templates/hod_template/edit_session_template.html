@@ -1,0 +1,97 @@
+{% extends 'hod_template/base_template.html' %}
+
+{% block page_title %}
+    Edit Session Year
+{% endblock page_title %}
+
+{% block main_content %}
+
+{% load static %}
+
+<section class="content">
+        <div class="container-fluid">
+
+            <div class="row">
+                <div class="col-md-12">
+                    <!-- general form elements -->
+                    <div class="card card-primary">
+                    <div class="card-header">
+                        <h3 class="card-title">Edit Session Year</h3>
+                    </div>
+                    <!-- /.card-header -->
+                    <!-- form start -->
+                    <form role="form" method="POST" action="{% url 'edit_session_save' %}">
+                        {% csrf_token %}
+
+                        
+                                {% comment %} Display Messages {% endcomment %}
+                                {% if messages %}
+                                <div class="form-group">
+                                <div class="col-12">
+                                    {% for message in messages %}
+                                    {% if message.tags == "error" %}
+                                        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="margin-top: 10px;">
+                                        {{ message }}
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                        </div>
+                                    {% elif message.tags == "success" %}
+                                        <div class="alert alert-success alert-dismissible fade show" role="alert" style="margin-top: 10px;">
+                                        {{ message }}
+                                        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                                            <span aria-hidden="true">&times;</span>
+                                        </button>
+                                        </div>
+                                    {% endif %}
+                                    {% endfor %}
+                                </div>
+                                </div>
+                                {% endif %}
+                            
+
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label>Session Name (Optional)</label>
+                                <input type="text" class="form-control" name="session_name" maxlength="100" value="{{ session_year.session_name }}">
+                            </div>
+                            <div class="form-group">
+                                <label>Start Date</label>
+                                <input type="date" class="form-control" name="session_start_year" id="session_start_year" value="{{ session_year.session_start_year|date:'Y-m-d' }}" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label>End Date</label>
+                                <input type="date" class="form-control" name="session_end_year" id="session_end_year" value="{{ session_year.session_end_year|date:'Y-m-d' }}" required>
+                            </div>
+
+                        </div>
+                        <!-- /.card-body -->
+
+                        <div class="card-footer">
+                        <input type="hidden" name="session_id" value="{{ session_year.id }}" />
+                        <button type="submit" class="btn btn-primary">Update Session Year</button>
+                        </div>
+                    </form>
+                    </div>
+                    <!-- /.card -->
+
+                </div>
+            </div>
+
+        </div><!-- /.container-fluid -->
+      </section>
+
+  {% endblock main_content %}
+
+{% block custom_js %}
+<script>
+    $("#session_start_year").on("change", function () {
+        $("#session_end_year").attr("min", $(this).val());
+    });
+    $("#session_end_year").on("change", function () {
+        $("#session_start_year").attr("max", $(this).val());
+    });
+    $("#session_start_year, #session_end_year").trigger("change");
+</script>
+{% endblock custom_js %}
