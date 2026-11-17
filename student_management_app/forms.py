@@ -1,6 +1,24 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.db.models import Q
-from student_management_app.models import Attendance, Courses, SessionYearModel
+from student_management_app.models import (
+    Attendance,
+    Courses,
+    CustomUser,
+    SessionYearModel,
+    Subjects,
+)
+from student_management_app.validators import (
+    MAX_PROFILE_PHOTO_SIZE,
+    validate_profile_photo,
+)
+
+
+class ProfileImageField(forms.ImageField):
+    def to_python(self, data):
+        if hasattr(data, "size") and data.size > MAX_PROFILE_PHOTO_SIZE:
+            raise ValidationError("Profile photos must be 5 MB or smaller.")
+        return super().to_python(data)
 
 
 class DateInput(forms.DateInput):
@@ -59,7 +77,15 @@ class AddStudentForm(forms.Form):
     course_id = forms.ChoiceField(label="Course", choices=(), widget=forms.Select(attrs={"class":"form-control"}))
     gender = forms.ChoiceField(label="Gender", choices=gender_list, widget=forms.Select(attrs={"class":"form-control"}))
     session_year_id = forms.ChoiceField(label="Session Year", choices=(), widget=forms.Select(attrs={"class":"form-control"}))
-    profile_pic = forms.FileField(label="Profile Pic", required=False, widget=forms.FileInput(attrs={"class":"form-control"}))
+    profile_pic = ProfileImageField(
+        label="Profile Pic",
+        required=False,
+        validators=[validate_profile_photo],
+        widget=forms.FileInput(attrs={
+            "class": "form-control-file",
+            "accept": ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
+        }),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -86,7 +112,15 @@ class EditStudentForm(forms.Form):
     course_id = forms.ChoiceField(label="Course", choices=(), widget=forms.Select(attrs={"class":"form-control"}))
     gender = forms.ChoiceField(label="Gender", choices=gender_list, widget=forms.Select(attrs={"class":"form-control"}))
     session_year_id = forms.ChoiceField(label="Session Year", choices=(), widget=forms.Select(attrs={"class":"form-control"}))
-    profile_pic = forms.FileField(label="Profile Pic", required=False, widget=forms.FileInput(attrs={"class":"form-control"}))
+    profile_pic = ProfileImageField(
+        label="Profile Pic",
+        required=False,
+        validators=[validate_profile_photo],
+        widget=forms.FileInput(attrs={
+            "class": "form-control-file",
+            "accept": ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
+        }),
+    )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -96,3 +130,124 @@ class EditStudentForm(forms.Form):
         self.fields["session_year_id"].choices = [
             (session.id, session.display_name) for session in SessionYearModel.objects.all()
         ]
+
+
+class StudentSearchForm(forms.Form):
+    q = forms.CharField(
+        label="Search students",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Name, username, email, address, course, or session",
+        }),
+    )
+    course_id = forms.ModelChoiceField(
+        label="Course",
+        queryset=Courses.objects.none(),
+        required=False,
+        empty_label="All courses",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    session_year_id = forms.ModelChoiceField(
+        label="Academic session",
+        queryset=SessionYearModel.objects.none(),
+        required=False,
+        empty_label="All sessions",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    gender = forms.ChoiceField(
+        label="Gender",
+        required=False,
+        choices=(("", "All genders"), ("Male", "Male"), ("Female", "Female")),
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["course_id"].queryset = Courses.objects.order_by("course_name")
+        self.fields["course_id"].label_from_instance = lambda course: course.course_name
+        self.fields["session_year_id"].queryset = SessionYearModel.objects.order_by(
+            "-session_start_year",
+        )
+        self.fields["session_year_id"].label_from_instance = (
+            lambda session: session.display_name
+        )
+
+
+class ProfilePhotoForm(forms.ModelForm):
+    profile_photo = ProfileImageField(
+        required=False,
+        validators=[validate_profile_photo],
+        widget=forms.FileInput(attrs={
+            "class": "form-control-file",
+            "accept": ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp",
+        }),
+    )
+    clear_photo = forms.BooleanField(
+        label="Remove current profile photo",
+        required=False,
+    )
+
+    class Meta:
+        model = CustomUser
+        fields = ("profile_photo",)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("clear_photo") and self.files.get("profile_photo"):
+            raise forms.ValidationError(
+                "Choose a new photo or remove the current photo, not both."
+            )
+        return cleaned_data
+
+
+class ProfileDirectoryFilterForm(forms.Form):
+    q = forms.CharField(
+        label="Search",
+        required=False,
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Name, role, student ID, or staff ID",
+        }),
+    )
+    role = forms.ChoiceField(
+        label="Role",
+        required=False,
+        choices=(("", "All roles"), ("3", "Student"), ("2", "Staff / Teacher")),
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    course_id = forms.ModelChoiceField(
+        label="Course / class",
+        queryset=Courses.objects.none(),
+        required=False,
+        empty_label="All courses",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    subject_id = forms.ModelChoiceField(
+        label="Subject",
+        queryset=Subjects.objects.none(),
+        required=False,
+        empty_label="All subjects",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+    session_year_id = forms.ModelChoiceField(
+        label="Academic session",
+        queryset=SessionYearModel.objects.none(),
+        required=False,
+        empty_label="All sessions",
+        widget=forms.Select(attrs={"class": "form-control"}),
+    )
+
+    def __init__(self, *args, courses=None, subjects=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["course_id"].queryset = (
+            courses if courses is not None else Courses.objects.order_by("course_name")
+        )
+        self.fields["subject_id"].queryset = (
+            subjects if subjects is not None else Subjects.objects.order_by("subject_name")
+        )
+        self.fields["session_year_id"].queryset = SessionYearModel.objects.order_by(
+            "-session_start_year",
+        )

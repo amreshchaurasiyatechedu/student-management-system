@@ -139,7 +139,7 @@
                 $.ajax({
                     url:'{% url 'get_attendance_dates' %}',
                     type:'POST',
-                    data:{subject:subject, session_year_id:session_year_id},
+                    data:{subject:subject, session_year_id:session_year_id, csrfmiddlewaretoken:"{{ csrf_token }}"},
                 })
 
                 
@@ -193,51 +193,47 @@
             $.ajax({
                 url:'{% url 'get_attendance_student' %}',
                 type:'POST',
-                data:{attendance_date:attendance_date},
+                data:{attendance_date:attendance_date, csrfmiddlewaretoken:"{{ csrf_token }}"},
             })
 
             
             .done(function(response){
-                var json_data=JSON.parse(response);
+                var json_data=response;
                 console.log(json_data)
                 //Displaying Attendance Date Input and Students Attendance
-                var div_data="<div class='form-group'><label>Student Attendance: </label></div>"
-                div_data+="<div class='form-group'><div class='row'>"
-
-                for(key in json_data)
-                {
-                    div_data+="<div class='col-lg-3'><div class='form-check'><input type='checkbox' ";
-
-                    if(json_data[key]['status'])
-                    {
-                        div_data+="checked='checked'";
-                    }
-                    else
-                    {
-                        div_data+="";
-                    }
-                    div_data+="name='student_data[]' value='"+ json_data[key]['id'] +"' />  <label class='form-check-label'>"+ json_data[key]['name']+" </label> ";
-                    
-                    // Displaying Present and Absent
-
-                    if(json_data[key]['status'])
-                    {
-                        div_data+="<b>[ Present ]</b>";
-                    }
-                    else
-                    {
-                        div_data+="<b>[ Absent ]</b>";
-                    }
-                    //Displaying Present and Absent Ends Here
-                    
-
-                    div_data+="</div></div> ";
-                }
-                div_data+="</div></div>";
-                div_data+="<div class='form-group'>";
-                div_data+="<button id='save_attendance' class='btn btn-success' type='button'>Save Attendance Data</button>";
-                div_data+="</div>";
-                $("#student_data").html(div_data);
+                var $studentData = $("<div>");
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<label>").text("Student Attendance: "))
+                );
+                var $studentRow = $("<div>").addClass("form-group row");
+                json_data.forEach(function(student) {
+                    var $checkbox = $("<input>", {
+                        type: "checkbox",
+                        name: "student_data[]",
+                        value: student.id,
+                        checked: student.status
+                    });
+                    var attendanceLabel = student.status ? " [ Present ]" : " [ Absent ]";
+                    var $label = $("<label>").addClass("form-check-label")
+                        .append($checkbox)
+                        .append(document.createTextNode(" " + student.name + attendanceLabel));
+                    $studentRow.append(
+                        $("<div>").addClass("col-lg-3")
+                            .append($("<div>").addClass("form-check").append($label))
+                    );
+                });
+                $studentData.append($studentRow);
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<button>", {
+                            id: "save_attendance",
+                            class: "btn btn-success",
+                            type: "button",
+                            text: "Save Attendance Data"
+                        }))
+                );
+                $("#student_data").empty().append($studentData.children());
 
             })
             .fail(function(){
@@ -275,7 +271,11 @@
                 $.ajax({
                     url:'{% url 'update_attendance_data' %}',
                     type:'POST',
-                    data:{student_ids:student_data, attendance_date:attendance_date},
+                    data:{
+                        student_ids:student_data,
+                        attendance_date:attendance_date,
+                        csrfmiddlewaretoken:"{{ csrf_token }}"
+                    },
                 })
 
                 

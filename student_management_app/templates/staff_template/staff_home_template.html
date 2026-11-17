@@ -11,6 +11,14 @@
 <section class="content">
         <div class="container-fluid">
 
+            <div class="app-welcome">
+                <div>
+                    <h2>Welcome back, {{ user.first_name|default:"there" }}</h2>
+                    <p>Review your classes, attendance activity, and teaching overview.</p>
+                </div>
+                <span class="app-welcome-icon" aria-hidden="true"><i class="fas fa-chalkboard-teacher"></i></span>
+            </div>
+
             {% comment %} Boxes Section Starts {% endcomment %}
             <div class="row">
                 <div class="col-lg-3 col-6">

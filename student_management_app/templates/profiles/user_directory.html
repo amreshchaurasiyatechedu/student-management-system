@@ -1,0 +1,119 @@
+{% extends base_template %}
+
+{% block page_title %}
+  {% if show_role_filter %}User directory{% else %}My students{% endif %}
+{% endblock page_title %}
+
+{% block main_content %}
+<section class="content">
+  <div class="container-fluid">
+    <div class="card profile-card">
+      <div class="card-header">
+        <h2 class="card-title">Search and filter profiles</h2>
+      </div>
+      <form method="get">
+        <div class="card-body">
+          <div class="row">
+            <div class="{% if show_role_filter %}col-md-4{% else %}col-md-6{% endif %} form-group">
+              {{ filter_form.q.label_tag }}
+              {{ filter_form.q }}
+            </div>
+            {% if show_role_filter %}
+              <div class="col-md-2 form-group">
+                {{ filter_form.role.label_tag }}
+                {{ filter_form.role }}
+              </div>
+            {% endif %}
+            <div class="col-md-2 form-group">
+              {{ filter_form.course_id.label_tag }}
+              {{ filter_form.course_id }}
+            </div>
+            <div class="col-md-2 form-group">
+              {{ filter_form.subject_id.label_tag }}
+              {{ filter_form.subject_id }}
+            </div>
+            <div class="col-md-2 form-group">
+              {{ filter_form.session_year_id.label_tag }}
+              {{ filter_form.session_year_id }}
+            </div>
+          </div>
+          {% if filter_form.errors %}
+            <div class="alert alert-danger" role="alert">
+              Please correct the selected filters.
+            </div>
+          {% endif %}
+        </div>
+        <div class="card-footer d-flex justify-content-between">
+          <a class="btn btn-outline-secondary" href="{% if show_role_filter %}{% url 'user_directory' %}{% else %}{% url 'staff_student_directory' %}{% endif %}">Clear filters</a>
+          <button type="submit" class="btn btn-primary">Apply filters</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card profile-card">
+      <div class="card-header">
+        <h2 class="card-title">Profiles ({{ page_obj.paginator.count }})</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover mb-0">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Role / ID</th>
+              <th scope="col">Course / class</th>
+              <th scope="col">Assigned subject</th>
+              <th scope="col">Academic session</th>
+              <th scope="col"><span class="sr-only">Action</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in rows %}
+              <tr>
+                <td>
+                  <div class="profile-list-user">
+                    {% include "profiles/avatar.html" with avatar_user=row.profile_user avatar_class="directory-avatar" %}
+                    <span>{{ row.profile_user.get_full_name|default:row.profile_user.username }}</span>
+                  </div>
+                </td>
+                <td>{{ row.role_label }} · {{ row.record_id }}</td>
+                <td>{{ row.course_name|default:"—" }}</td>
+                <td>
+                  {% for subject in row.subjects %}
+                    <span class="badge badge-light mr-1">{{ subject }}</span>
+                  {% empty %}
+                    —
+                  {% endfor %}
+                </td>
+                <td>{{ row.session_name|default:"—" }}</td>
+                <td>
+                  <a class="btn btn-sm btn-outline-primary"
+                     href="{% url 'profile_detail' user_id=row.profile_user.pk %}">
+                    View profile
+                  </a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="6" class="text-center text-muted py-4">No profiles match these filters.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% if page_obj.has_other_pages %}
+        <div class="card-footer d-flex justify-content-between align-items-center">
+          <span>Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          <div>
+            {% if previous_page_url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ previous_page_url }}">Previous</a>
+            {% endif %}
+            {% if next_page_url %}
+              <a class="btn btn-sm btn-outline-primary" href="{{ next_page_url }}">Next</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock main_content %}

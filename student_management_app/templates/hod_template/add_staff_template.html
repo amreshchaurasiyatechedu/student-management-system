@@ -115,7 +115,7 @@
                     $.ajax({
                         url : '{% url 'check_email_exist' %}',
                         type : 'POST',
-                        data : {email:email}
+                        data : {email:email, csrfmiddlewaretoken:"{{ csrf_token }}"}
                     })
                     .done(function(response){
                         //console.log(response);
@@ -147,7 +147,7 @@
                     $.ajax({
                         url : '{% url 'check_username_exist' %}',
                         type : 'POST',
-                        data : {username:username}
+                        data : {username:username, csrfmiddlewaretoken:"{{ csrf_token }}"}
                     })
                     .done(function(response){
                         //console.log(response);

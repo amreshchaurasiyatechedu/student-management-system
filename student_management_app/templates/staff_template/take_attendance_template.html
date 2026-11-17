@@ -114,31 +114,60 @@
             $.ajax({
                 url:'{% url 'get_students' %}',
                 type:'POST',
-                data:{subject:subject, session_year:session_year},
+                data:{subject:subject, session_year:session_year, csrfmiddlewaretoken:"{{ csrf_token }}"},
             })
 
             
             .done(function(response){
-                var json_data=JSON.parse(response);
+                var json_data=response;
                 if (json_data.length === 0) {
                     $("#student_data").html("<div class='alert alert-info'>No students are enrolled in this course for the selected session.</div>");
                     return;
                 }
                 //Displaying Attendance Date Input and Students Attendance
                 var selectedSession = $("#session_year option:selected");
-                var div_data="<div class='form-group'><label>Attendance Date: </label> <input type='date' name='attendance_date' id='attendance_date' min='" + selectedSession.data("start") + "' max='" + selectedSession.data("end") + "' class='form-control' required /></div>"
-                div_data+="<div class='form-group'><div class='row'>"
+                var $studentData = $("<div>");
+                var $dateInput = $("<input>", {
+                    type: "date",
+                    name: "attendance_date",
+                    id: "attendance_date",
+                    min: selectedSession.data("start"),
+                    max: selectedSession.data("end"),
+                    required: true
+                }).addClass("form-control");
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<label>").text("Attendance Date: "))
+                        .append($dateInput)
+                );
 
-                for(key in json_data)
-                {
-                    div_data+="<div class='col-lg-2'><div class='form-check'><input type='checkbox' checked='checked' name='student_data[]' value='"+ json_data[key]['id'] +"' />  <label class='form-check-label'>"+ json_data[key]['name']+" </label></div></div> ";
-
-                }
-                div_data+="</div></div>";
-                div_data+="<div class='form-group'>";
-                div_data+="<button id='save_attendance' class='btn btn-success' type='button'>Save Attendance Data</button>";
-                div_data+="</div>";
-                $("#student_data").html(div_data);
+                var $studentRow = $("<div>").addClass("form-group row");
+                json_data.forEach(function(student) {
+                    var $checkbox = $("<input>", {
+                        type: "checkbox",
+                        name: "student_data[]",
+                        value: student.id,
+                        checked: true
+                    });
+                    var $label = $("<label>").addClass("form-check-label")
+                        .append($checkbox)
+                        .append(document.createTextNode(" " + student.name));
+                    $studentRow.append(
+                        $("<div>").addClass("col-lg-2")
+                            .append($("<div>").addClass("form-check").append($label))
+                    );
+                });
+                $studentData.append($studentRow);
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<button>", {
+                            id: "save_attendance",
+                            class: "btn btn-success",
+                            type: "button",
+                            text: "Save Attendance Data"
+                        }))
+                );
+                $("#student_data").empty().append($studentData.children());
 
             })
             .fail(function(){
@@ -181,7 +210,13 @@
                 $.ajax({
                     url:'{% url 'save_attendance_data' %}',
                     type:'POST',
-                    data:{student_ids:student_data, attendance_date:attendance_date, subject_id:subject_id, session_year_id:session_year_id},
+                    data:{
+                        student_ids:student_data,
+                        attendance_date:attendance_date,
+                        subject_id:subject_id,
+                        session_year_id:session_year_id,
+                        csrfmiddlewaretoken:"{{ csrf_token }}"
+                    },
                 })
 
                 

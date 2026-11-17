@@ -44,16 +44,49 @@
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Student Details</h3>
-
-                            <div class="card-tools">
-                            <div class="input-group input-group-sm" style="width: 150px;">
-                                <input type="text" name="table_search" class="form-control float-right" placeholder="Search">
-
-                                <div class="input-group-append">
-                                <button type="submit" class="btn btn-default"><i class="fas fa-search"></i></button>
+                        </div>
+                        <div class="card-body border-bottom">
+                            <form method="get" action="{% url 'manage_student' %}">
+                                <div class="form-row align-items-end">
+                                    <div class="form-group col-lg-5 col-md-6">
+                                        {{ search_form.q.label_tag }}
+                                        {{ search_form.q }}
+                                    </div>
+                                    <div class="form-group col-lg-2 col-md-6">
+                                        {{ search_form.course_id.label_tag }}
+                                        {{ search_form.course_id }}
+                                    </div>
+                                    <div class="form-group col-lg-2 col-md-6">
+                                        {{ search_form.session_year_id.label_tag }}
+                                        {{ search_form.session_year_id }}
+                                    </div>
+                                    <div class="form-group col-lg-1 col-md-6">
+                                        {{ search_form.gender.label_tag }}
+                                        {{ search_form.gender }}
+                                    </div>
+                                    <div class="form-group col-lg-2 col-md-12">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search mr-1" aria-hidden="true"></i> Search
+                                        </button>
+                                        <a href="{% url 'manage_student' %}" class="btn btn-outline-secondary">Reset</a>
+                                    </div>
                                 </div>
-                            </div>
-                            </div>
+                            </form>
+
+                            {% if search_form.errors %}
+                                <div class="alert alert-danger mb-0" role="alert">
+                                    Please correct the invalid search filters.
+                                    {% for field in search_form %}
+                                        {% for error in field.errors %}
+                                            <div>{{ field.label }}: {{ error }}</div>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <p class="text-muted small mb-0">
+                                {{ paginator.count }} student{{ paginator.count|pluralize }} found.
+                                {% if paginator.count %}Showing {{ page_obj.start_index }}&ndash;{{ page_obj.end_index }}.{% endif %}
+                            </p>
                         </div>
                         <!-- /.card-header -->
                         <div class="card-body table-responsive p-0">
@@ -86,7 +119,7 @@
                                 <td>{{ student.admin.email }}</td>
                                 <td>{{ student.address }}</td>
                                 <td>{{ student.gender }}</td>
-                                <td> <img src="{{ student.profile_pic }}" style="width: 100px;" /> </td>
+                                <td>{% include "profiles/avatar.html" with avatar_user=student.admin avatar_class="directory-avatar" %}</td>
                                 <td>{{ student.session_year_id.session_start_year|date:"F j, Y" }}</td>
                                 <td>{{ student.session_year_id.session_end_year|date:"F j, Y" }}</td>
                                 <td>{{ student.course_id.course_name }}</td>
@@ -97,11 +130,32 @@
                                     <a href="{% url 'delete_student' student.admin.id %}" class="btn btn-danger">Delete</a>
                                 </td>
                                 </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="14" class="text-center text-muted py-4">No students match these filters.</td>
+                                </tr>
                                 {% endfor %}
                                 
                             </tbody>
                             </table>
                         </div>
+                        {% if page_obj.has_other_pages %}
+                            <div class="card-footer">
+                                <nav aria-label="Student list pages">
+                                    <ul class="pagination pagination-sm mb-0 justify-content-end">
+                                        {% if previous_page_url %}
+                                            <li class="page-item"><a class="page-link" href="{{ previous_page_url }}">Previous</a></li>
+                                        {% endif %}
+                                        <li class="page-item disabled">
+                                            <span class="page-link">Page {{ page_obj.number }} of {{ paginator.num_pages }}</span>
+                                        </li>
+                                        {% if next_page_url %}
+                                            <li class="page-item"><a class="page-link" href="{{ next_page_url }}">Next</a></li>
+                                        {% endif %}
+                                    </ul>
+                                </nav>
+                            </div>
+                        {% endif %}
                         <!-- /.card-body -->
                         </div>
                     <!-- /.card -->

@@ -3,6 +3,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.http import HttpResponseRedirect, HttpResponse
 from django.shortcuts import render, redirect
 from django.contrib import messages
+from django.views.decorators.cache import never_cache
 
 from student_management_app.EmailBackEnd import EmailBackEnd
 
@@ -11,8 +12,21 @@ def home(request):
     return render(request, 'index.html')
 
 
+@never_cache
 def loginPage(request):
+    if request.user.is_authenticated:
+        dashboard = {
+            "1": "admin_home",
+            "2": "staff_home",
+            "3": "student_home",
+        }.get(request.user.user_type)
+        if dashboard:
+            return redirect(dashboard)
     return render(request, 'login.html')
+
+
+def about(request):
+    return render(request, 'about.html')
 
 
 

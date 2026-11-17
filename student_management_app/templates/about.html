@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<body class="app-about-page">
+  <main class="about-card">
+    <header class="about-card-header d-flex flex-wrap align-items-center justify-content-between">
+      <div class="d-flex align-items-center">
+        <span class="brand-mark mr-3" aria-hidden="true"><i class="fas fa-graduation-cap"></i></span>
+        <div>
+          <p class="mb-1 text-muted">About the application</p>
+          <h1 class="h3 mb-0">Amresh Student Management System</h1>
+        </div>
+      </div>
+      <a class="btn btn-primary mt-3 mt-md-0" href="{% url 'login' %}">
+        <i class="fas fa-sign-in-alt mr-1" aria-hidden="true"></i> Sign in
+      </a>
+    </header>
+
+    <div class="about-card-body">
+      <p class="lead">
+        A Django application for coordinating student, staff, course, attendance, and academic-result workflows.
+      </p>
+      <p>
+        The system provides separate workspaces for administrators, staff, and students. Depending on their account,
+        users can manage institutional records, take or review attendance, work with results, submit leave requests,
+        and exchange feedback.
+      </p>
+
+      <div class="row mt-4">
+        <section class="col-md-6 mb-4" aria-labelledby="maintainer-heading">
+          <h2 id="maintainer-heading" class="h5">Maintainer</h2>
+          <p class="mb-1"><strong>Amresh Chaurasiya</strong></p>
+          <p class="mb-0 text-muted">Project maintainer and application branding.</p>
+        </section>
+        <section class="col-md-6 mb-4" aria-labelledby="release-heading">
+          <h2 id="release-heading" class="h5">Application information</h2>
+          <p class="mb-1">Version 1.0</p>
+          <p class="mb-0 text-muted">Built with Django templates and the AdminLTE interface theme.</p>
+        </section>
+      </div>
+
+      <hr>
+      <p class="small text-muted mb-0">
+        The application interface uses
+        <a href="https://github.com/ColorlibHQ/AdminLTE/tree/v3.0.5" target="_blank" rel="noopener noreferrer">AdminLTE 3.0.5</a>.
+        Copyright &copy; {% now "Y" %} Amresh Chaurasiya.
+      </p>
+    </div>
+  </main>
+</body>
+{% endblock %}

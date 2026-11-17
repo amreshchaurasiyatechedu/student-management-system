@@ -1,9 +1,37 @@
+# Python environments and generated files
 .venv/
+venv/
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+build/
+dist/
+
+# Django local data and output
 db.sqlite3
+*.sqlite3
+*.sqlite3-journal
+*.db
 media/
+staticfiles/
+*.log
+
+# Local environment variables and secrets
 .env
 .env.*
 !.env.example
+
+# Test and analysis output
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Operating system and IDE files
 .DS_Store
+Thumbs.db
+.idea/

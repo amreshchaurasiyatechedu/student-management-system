@@ -1,13 +1,14 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Student Management System | Amresh Chaurasiya</title>
+  <title>Amresh Student Management System</title>
   <!-- Tell the browser to be responsive to screen width -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14243a">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="{% static "fontawesome-free/css/all.min.css" %}">
   <!-- Ionicons -->
@@ -28,7 +29,7 @@
   <link rel="stylesheet" href="{% static "summernote/summernote-bs4.css" %}">
   <!-- Google Font: Source Sans Pro -->
   <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
-
+  <link rel="stylesheet" href="{% static 'css/brand.css' %}">
 
 </head>
 
@@ -51,8 +52,6 @@
 <script src="{% static "bootstrap/js/bootstrap.bundle.min.js"  %}"></script>
 <!-- ChartJS -->
 <script src="{% static "chart.js/Chart.min.js"  %}"></script>
-<!-- Sparkline -->
-<script src="{% static "sparklines/sparkline.js"  %}"></script>
 <!-- JQVMap -->
 <script src="{% static "jqvmap/jquery.vmap.min.js"  %}"></script>
 <script src="{% static "jqvmap/maps/jquery.vmap.usa.js"  %}"></script>
@@ -69,9 +68,5 @@
 <script src="{% static "overlayScrollbars/js/jquery.overlayScrollbars.min.js"  %}"></script>
 <!-- AdminLTE App -->
 <script src="{% static 'dist/js/adminlte.js'  %}"></script>
-<!-- AdminLTE dashboard demo (This is only for demo purposes) -->
-<script src="{% static 'dist/js/pages/dashboard.js'  %}"></script>
-<!-- AdminLTE for demo purposes -->
-<script src="{% static 'dist/js/demo.js'  %}"></script>
 </body>
 </html>

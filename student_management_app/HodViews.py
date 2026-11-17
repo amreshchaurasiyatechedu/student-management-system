@@ -1,16 +1,22 @@
+import logging
+
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
-from django.core.files.storage import FileSystemStorage #To upload Profile Picture
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_http_methods, require_POST
 from django.shortcuts import get_object_or_404
 from django.core import serializers
 import json
 
 from student_management_app.models import CustomUser, Staffs, Courses, Subjects, Students, SessionYearModel, FeedBackStudent, FeedBackStaffs, LeaveReportStudent, LeaveReportStaff, Attendance, AttendanceReport
-from .forms import AddStudentForm, EditStudentForm, SessionYearForm
+from .forms import AddStudentForm, EditStudentForm, SessionYearForm, StudentSearchForm
+from .utils import _positive_id
+
+
+logger = logging.getLogger(__name__)
 
 
 def admin_home(request):
@@ -408,21 +414,18 @@ def add_student_save(request):
             session_year_id = form.cleaned_data['session_year_id']
             course_id = form.cleaned_data['course_id']
             gender = form.cleaned_data['gender']
-
-            # Getting Profile Pic first
-            # First Check whether the file is selected or not
-            # Upload only if file is selected
-            if len(request.FILES) != 0:
-                profile_pic = request.FILES['profile_pic']
-                fs = FileSystemStorage()
-                filename = fs.save(profile_pic.name, profile_pic)
-                profile_pic_url = fs.url(filename)
-            else:
-                profile_pic_url = None
-
+            profile_photo = form.cleaned_data.get("profile_pic")
 
             try:
-                user = CustomUser.objects.create_user(username=username, password=password, email=email, first_name=first_name, last_name=last_name, user_type=3)
+                user = CustomUser.objects.create_user(
+                    username=username,
+                    password=password,
+                    email=email,
+                    first_name=first_name,
+                    last_name=last_name,
+                    user_type=3,
+                    profile_photo=profile_photo or "",
+                )
                 user.students.address = address
 
                 course_obj = Courses.objects.get(id=course_id)
@@ -432,7 +435,6 @@ def add_student_save(request):
                 user.students.session_year_id = session_year_obj
 
                 user.students.gender = gender
-                user.students.profile_pic = profile_pic_url
                 user.save()
                 messages.success(request, "Student Added Successfully!")
                 return redirect('add_student')
@@ -444,9 +446,51 @@ def add_student_save(request):
 
 
 def manage_student(request):
-    students = Students.objects.all()
+    search_form = StudentSearchForm(request.GET)
+    students = Students.objects.select_related(
+        "admin",
+        "course_id",
+        "session_year_id",
+    ).order_by("admin__last_name", "admin__first_name", "pk")
+
+    if search_form.is_valid():
+        cleaned_data = search_form.cleaned_data
+        for term in cleaned_data["q"].split():
+            students = students.filter(
+                Q(admin__first_name__icontains=term)
+                | Q(admin__last_name__icontains=term)
+                | Q(admin__username__icontains=term)
+                | Q(admin__email__icontains=term)
+                | Q(address__icontains=term)
+                | Q(course_id__course_name__icontains=term)
+                | Q(session_year_id__session_name__icontains=term)
+            )
+        if cleaned_data["course_id"]:
+            students = students.filter(course_id=cleaned_data["course_id"])
+        if cleaned_data["session_year_id"]:
+            students = students.filter(session_year_id=cleaned_data["session_year_id"])
+        if cleaned_data["gender"]:
+            students = students.filter(gender=cleaned_data["gender"])
+    else:
+        students = students.none()
+
+    paginator = Paginator(students, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    def page_url(page_number):
+        query_params = request.GET.copy()
+        query_params["page"] = page_number
+        return f"?{query_params.urlencode()}"
+
     context = {
-        "students": students
+        "students": page_obj.object_list,
+        "search_form": search_form,
+        "page_obj": page_obj,
+        "paginator": paginator,
+        "previous_page_url": (
+            page_url(page_obj.previous_page_number()) if page_obj.has_previous() else None
+        ),
+        "next_page_url": page_url(page_obj.next_page_number()) if page_obj.has_next() else None,
     }
     return render(request, 'hod_template/manage_student_template.html', context)
 
@@ -493,26 +537,36 @@ def edit_student_save(request):
             course_id = form.cleaned_data['course_id']
             gender = form.cleaned_data['gender']
             session_year_id = form.cleaned_data['session_year_id']
-
-            # Getting Profile Pic first
-            # First Check whether the file is selected or not
-            # Upload only if file is selected
-            if len(request.FILES) != 0:
-                profile_pic = request.FILES['profile_pic']
-                fs = FileSystemStorage()
-                filename = fs.save(profile_pic.name, profile_pic)
-                profile_pic_url = fs.url(filename)
-            else:
-                profile_pic_url = None
+            profile_photo = form.cleaned_data.get("profile_pic")
 
             try:
                 # First Update into Custom User Model
                 user = CustomUser.objects.get(id=student_id)
+                old_profile_photo = user.profile_photo
+                old_profile_photo_name = (
+                    old_profile_photo.name if old_profile_photo else ""
+                )
+                profile_photo_storage = old_profile_photo.storage
                 user.first_name = first_name
                 user.last_name = last_name
                 user.email = email
                 user.username = username
+                if profile_photo:
+                    user.profile_photo = profile_photo
                 user.save()
+                old_photo_deleted = True
+                if (
+                    profile_photo
+                    and old_profile_photo_name
+                    and old_profile_photo_name != user.profile_photo.name
+                ):
+                    try:
+                        profile_photo_storage.delete(old_profile_photo_name)
+                    except PermissionError:
+                        logger.warning(
+                            "A replaced student profile photo is still in use and could not be deleted."
+                        )
+                        old_photo_deleted = False
 
                 # Then Update Students Table
                 student_model = Students.objects.get(admin=student_id)
@@ -525,13 +579,17 @@ def edit_student_save(request):
                 student_model.session_year_id = session_year_obj
 
                 student_model.gender = gender
-                if profile_pic_url != None:
-                    student_model.profile_pic = profile_pic_url
                 student_model.save()
                 # Delete student_id SESSION after the data is updated
                 del request.session['student_id']
 
-                messages.success(request, "Student Updated Successfully!")
+                if old_photo_deleted:
+                    messages.success(request, "Student Updated Successfully!")
+                else:
+                    messages.warning(
+                        request,
+                        "Student updated, but the previous profile photo file is still in use and could not be removed.",
+                    )
                 return redirect('/edit_student/'+student_id)
             except:
                 messages.success(request, "Failed to Uupdate Student.")
@@ -649,9 +707,11 @@ def delete_subject(request, subject_id):
         return redirect('manage_subject')
 
 
-@csrf_exempt
+@require_POST
 def check_email_exist(request):
-    email = request.POST.get("email")
+    email = request.POST.get("email", "").strip()
+    if not email:
+        return HttpResponseBadRequest("Email is required.")
     user_obj = CustomUser.objects.filter(email=email).exists()
     if user_obj:
         return HttpResponse(True)
@@ -659,9 +719,11 @@ def check_email_exist(request):
         return HttpResponse(False)
 
 
-@csrf_exempt
+@require_POST
 def check_username_exist(request):
-    username = request.POST.get("username")
+    username = request.POST.get("username", "").strip()
+    if not username:
+        return HttpResponseBadRequest("Username is required.")
     user_obj = CustomUser.objects.filter(username=username).exists()
     if user_obj:
         return HttpResponse(True)
@@ -678,19 +740,17 @@ def student_feedback_message(request):
     return render(request, 'hod_template/student_feedback_template.html', context)
 
 
-@csrf_exempt
+@require_POST
 def student_feedback_message_reply(request):
-    feedback_id = request.POST.get('id')
-    feedback_reply = request.POST.get('reply')
+    feedback_id = _positive_id(request.POST.get("id"))
+    feedback_reply = request.POST.get("reply", "").strip()
+    if feedback_id is None or not feedback_reply:
+        return HttpResponseBadRequest("A valid feedback ID and reply are required.")
 
-    try:
-        feedback = FeedBackStudent.objects.get(id=feedback_id)
-        feedback.feedback_reply = feedback_reply
-        feedback.save()
-        return HttpResponse("True")
-
-    except:
-        return HttpResponse("False")
+    feedback = get_object_or_404(FeedBackStudent, id=feedback_id)
+    feedback.feedback_reply = feedback_reply
+    feedback.save(update_fields=["feedback_reply", "updated_at"])
+    return HttpResponse("True")
 
 
 def staff_feedback_message(request):
@@ -701,19 +761,17 @@ def staff_feedback_message(request):
     return render(request, 'hod_template/staff_feedback_template.html', context)
 
 
-@csrf_exempt
+@require_POST
 def staff_feedback_message_reply(request):
-    feedback_id = request.POST.get('id')
-    feedback_reply = request.POST.get('reply')
+    feedback_id = _positive_id(request.POST.get("id"))
+    feedback_reply = request.POST.get("reply", "").strip()
+    if feedback_id is None or not feedback_reply:
+        return HttpResponseBadRequest("A valid feedback ID and reply are required.")
 
-    try:
-        feedback = FeedBackStaffs.objects.get(id=feedback_id)
-        feedback.feedback_reply = feedback_reply
-        feedback.save()
-        return HttpResponse("True")
-
-    except:
-        return HttpResponse("False")
+    feedback = get_object_or_404(FeedBackStaffs, id=feedback_id)
+    feedback.feedback_reply = feedback_reply
+    feedback.save(update_fields=["feedback_reply", "updated_at"])
+    return HttpResponse("True")
 
 
 def student_leave_view(request):
@@ -769,16 +827,18 @@ def admin_view_attendance(request):
     return render(request, "hod_template/admin_view_attendance.html", context)
 
 
-@csrf_exempt
+@require_POST
 def admin_get_attendance_dates(request):
-    # Getting Values from Ajax POST 'Fetch Student'
-    subject_id = request.POST.get("subject")
-    session_year = request.POST.get("session_year_id")
+    subject_id = _positive_id(request.POST.get("subject"))
+    session_year_id = _positive_id(request.POST.get("session_year_id"))
+    if subject_id is None or session_year_id is None:
+        return JsonResponse(
+            {"error": "Select a valid subject and academic session."},
+            status=400,
+        )
 
-    # Students enroll to Course, Course has Subjects
-    # Getting all data from subject model based on subject_id
     subject_model = get_object_or_404(Subjects, id=subject_id)
-    session_model = get_object_or_404(SessionYearModel, id=session_year)
+    session_model = get_object_or_404(SessionYearModel, id=session_year_id)
 
     attendance = Attendance.objects.filter(
         subject_id=subject_model,
@@ -786,31 +846,36 @@ def admin_get_attendance_dates(request):
         attendance_date__range=(session_model.session_start_year, session_model.session_end_year),
     ).order_by("attendance_date")
 
-    # Only Passing Student Id and Student Name Only
-    list_data = []
-
-    for attendance_single in attendance:
-        data_small={"id":attendance_single.id, "attendance_date":str(attendance_single.attendance_date), "session_year_id":attendance_single.session_year_id.id}
-        list_data.append(data_small)
-
+    list_data = [
+        {
+            "id": attendance_record.id,
+            "attendance_date": str(attendance_record.attendance_date),
+            "session_year_id": attendance_record.session_year_id_id,
+        }
+        for attendance_record in attendance
+    ]
     return JsonResponse(list_data, safe=False)
 
 
-@csrf_exempt
+@require_POST
 def admin_get_attendance_student(request):
-    # Getting Values from Ajax POST 'Fetch Student'
-    attendance_date = request.POST.get('attendance_date')
-    attendance = Attendance.objects.get(id=attendance_date)
+    attendance_id = _positive_id(request.POST.get("attendance_date"))
+    if attendance_id is None:
+        return JsonResponse({"error": "Select a valid attendance date."}, status=400)
+    attendance = get_object_or_404(Attendance, id=attendance_id)
 
-    attendance_data = AttendanceReport.objects.filter(attendance_id=attendance)
-    # Only Passing Student Id and Student Name Only
-    list_data = []
-
-    for student in attendance_data:
-        data_small={"id":student.student_id.admin.id, "name":student.student_id.admin.first_name+" "+student.student_id.admin.last_name, "status":student.status}
-        list_data.append(data_small)
-
-    return JsonResponse(json.dumps(list_data), content_type="application/json", safe=False)
+    attendance_data = AttendanceReport.objects.filter(
+        attendance_id=attendance,
+    ).select_related("student_id__admin")
+    list_data = [
+        {
+            "id": report.student_id.admin_id,
+            "name": f"{report.student_id.admin.first_name} {report.student_id.admin.last_name}".strip(),
+            "status": report.status,
+        }
+        for report in attendance_data
+    ]
+    return JsonResponse(list_data, safe=False)
 
 
 def admin_profile(request):

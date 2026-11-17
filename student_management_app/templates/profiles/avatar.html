@@ -1,0 +1,9 @@
+<span class="profile-avatar {{ avatar_class }}" role="img"
+      aria-label="{{ avatar_user.get_full_name|default:avatar_user.username }} profile photo">
+  {% if avatar_user.has_profile_photo %}
+    <img src="{% url 'profile_photo' user_id=avatar_user.pk %}"
+         alt="{{ avatar_user.get_full_name|default:avatar_user.username }}">
+  {% else %}
+    <span aria-hidden="true">{{ avatar_user.avatar_initials }}</span>
+  {% endif %}
+</span>

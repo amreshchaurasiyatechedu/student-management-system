@@ -1,0 +1,74 @@
+<div class="card profile-card">
+  <div class="card-header">
+    <h2 class="card-title">Profile photo</h2>
+  </div>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="card-body">
+      <p class="text-muted">Choose a JPG, JPEG, PNG, or WebP image up to 5 MB.</p>
+      {% for error in photo_form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">{{ error }}</div>
+      {% endfor %}
+      <div class="form-group">
+        <label for="{{ photo_form.profile_photo.id_for_label }}">
+          {% if profile_user.has_profile_photo %}Change photo{% else %}Upload photo{% endif %}
+        </label>
+        {{ photo_form.profile_photo }}
+        {% for error in photo_form.profile_photo.errors %}
+          <div class="text-danger small">{{ error }}</div>
+        {% endfor %}
+      </div>
+      <img id="profile-photo-preview"
+           class="profile-avatar profile-avatar-large d-none mb-3"
+           alt="Selected profile photo preview">
+      {% if profile_user.profile_photo %}
+        <div class="form-check">
+          {{ photo_form.clear_photo }}
+          <label class="form-check-label" for="{{ photo_form.clear_photo.id_for_label }}">
+            Remove photo
+          </label>
+        </div>
+      {% endif %}
+    </div>
+    <div class="card-footer">
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save mr-1" aria-hidden="true"></i> Save photo
+      </button>
+    </div>
+  </form>
+</div>
+<script>
+  (() => {
+    const input = document.getElementById("id_profile_photo");
+    const preview = document.getElementById("profile-photo-preview");
+    if (!input || !preview) {
+      return;
+    }
+
+    let previewUrl = null;
+    const clearPreview = () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+      }
+      preview.removeAttribute("src");
+      preview.classList.add("d-none");
+    };
+
+    input.addEventListener("change", () => {
+      clearPreview();
+      const file = input.files && input.files[0];
+      if (file) {
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+        preview.classList.remove("d-none");
+      }
+    });
+
+    window.addEventListener("pagehide", () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    });
+  })();
+</script>

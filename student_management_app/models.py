@@ -1,8 +1,17 @@
+from pathlib import Path
+import uuid
+
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+from .validators import validate_profile_photo
+
+
+def profile_photo_upload_path(instance, filename):
+    extension = Path(filename).suffix.lower()
+    return f"profile_photos/user_{instance.pk}/{uuid.uuid4().hex}{extension}"
 
 
 class SessionYearModel(models.Model):
@@ -24,6 +33,27 @@ class SessionYearModel(models.Model):
 class CustomUser(AbstractUser):
     user_type_data = ((1, "HOD"), (2, "Staff"), (3, "Student"))
     user_type = models.CharField(default=1, choices=user_type_data, max_length=10)
+    profile_photo = models.ImageField(
+        blank=True,
+        upload_to=profile_photo_upload_path,
+        validators=[validate_profile_photo],
+    )
+
+    @property
+    def avatar_initials(self):
+        first_name = self.first_name.strip()
+        last_name = self.last_name.strip()
+        if first_name and last_name:
+            return f"{first_name[0]}{last_name[0]}".upper()
+        name = first_name or last_name or self.username
+        return name[:2].upper()
+
+    @property
+    def has_profile_photo(self):
+        return bool(
+            self.profile_photo
+            and self.profile_photo.storage.exists(self.profile_photo.name)
+        )
 
 
 

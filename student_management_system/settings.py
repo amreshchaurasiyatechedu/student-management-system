@@ -11,14 +11,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "").strip()
 if not SECRET_KEY:
     raise ImproperlyConfigured("Set the DJANGO_SECRET_KEY environment variable.")
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+def _environment_flag(name, default=False):
+    value = os.environ.get(name)
+    if value is None:
+        return default
 
-ALLOWED_HOSTS = []
+    normalized_value = value.strip().lower()
+    if normalized_value in {"1", "true", "yes", "on"}:
+        return True
+    if normalized_value in {"0", "false", "no", "off"}:
+        return False
+    raise ImproperlyConfigured(f"{name} must be a boolean value.")
+
+
+DEBUG = _environment_flag("DJANGO_DEBUG")
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if host.strip()
+]
+if "*" in ALLOWED_HOSTS:
+    raise ImproperlyConfigured("DJANGO_ALLOWED_HOSTS must not contain '*'.")
 
 
 # Application definition
@@ -126,6 +143,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 #For Custom USER
 AUTH_USER_MODEL = "student_management_app.CustomUser"
+DEFAULT_AUTO_FIELD = "django.db.models.AutoField"
 
 # Registering Custom Backend "EmailBackEnd"
 AUTHENTICATION_BACKENDS = ['student_management_app.EmailBackEnd.EmailBackEnd']

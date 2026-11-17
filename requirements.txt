@@ -3,6 +3,7 @@ Django==6.1.2
 django-extensions==4.1
 graphviz==0.21
 mysql-connector-python==26.7.0
+Pillow==12.0.0
 protobuf==7.36.2
 pydot==4.0.1
 pyparsing==3.3.3

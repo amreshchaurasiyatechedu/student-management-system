@@ -1,4 +1,4 @@
-# Django Student Management System
+# Amresh Student Management System
 
 [![Python](https://img.shields.io/badge/Python-3.13%20tested-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![Django](https://img.shields.io/badge/Django-6.1.2-092E20?logo=django&logoColor=white)](https://www.djangoproject.com/)
@@ -27,6 +27,7 @@ An educational Django application for managing students, staff, courses, attenda
 - [Authentication and demo accounts](#authentication-and-demo-accounts)
 - [Tests](#tests)
 - [Roadmap](#roadmap)
+- [Project documentation and maintenance](#project-documentation-and-maintenance)
 - [Security and best practices](#security-and-best-practices)
 - [Contributing](#contributing)
 - [License](#license)
@@ -46,6 +47,7 @@ The project was developed for educational purposes while learning Django and is 
 - Create, edit, list, and delete staff, students, courses, and subjects.
 - Manage academic sessions with optional names and custom start/end dates.
 - Review attendance records by subject and academic session.
+- Manage personal profile photos and manage student/staff photos from their authorized profiles; browse the role-scoped directory.
 - Review and reply to student and staff feedback.
 - Approve or reject student and staff leave requests.
 - Update the administrator profile.
@@ -59,6 +61,7 @@ Academic session dates are used when recording and viewing attendance. A session
 - Add or update student exam and assignment marks.
 - Submit and review leave applications.
 - Send feedback to the HOD and view replies.
+- Manage a personal profile photo and browse students in assigned courses only.
 - Update the staff profile.
 
 ### Students
@@ -68,6 +71,7 @@ Academic session dates are used when recording and viewing attendance. A session
 - View recorded subject exam and assignment results.
 - Submit and review leave applications.
 - Send feedback to the HOD and view replies.
+- Manage a personal profile photo and view permitted profile information.
 - Update the student profile.
 
 ## Screenshots and demo
@@ -123,7 +127,7 @@ SQLite is the database engine configured by `student_management_system/settings.
 
 Python package versions are pinned in [`requirements.txt`](requirements.txt):
 
-`asgiref`, `Django`, `django-extensions`, `graphviz`, `mysql-connector-python`, `protobuf`, `pydot`, `pyparsing`, `pytz`, `six`, `sqlparse`, and `tzdata`.
+`asgiref`, `Django`, `django-extensions`, `graphviz`, `mysql-connector-python`, `Pillow`, `protobuf`, `pydot`, `pyparsing`, `pytz`, `six`, `sqlparse`, and `tzdata`.
 
 ### Development tools
 
@@ -136,9 +140,13 @@ Python package versions are pinned in [`requirements.txt`](requirements.txt):
 ```text
 .
 ├── .gitignore                       # Excludes local secrets, database, uploads, and caches
+├── CHANGELOG.md                     # Unreleased and published project changes
+├── CONTRIBUTING.md                  # Development and pull request guidance
 ├── manage.py
 ├── requirements.txt
 ├── static/                            # Bundled CSS, JavaScript, and image assets
+├── docs/
+│   └── MAINTENANCE.md                # Provenance and maintainer responsibilities
 ├── student_management_system/
 │   ├── settings.py                    # Settings, installed app, database, static/media paths
 │   ├── urls.py                        # Project URL configuration and media serving
@@ -150,15 +158,19 @@ Python package versions are pinned in [`requirements.txt`](requirements.txt):
     ├── urls.py                       # Application routes
     ├── views.py                      # Login, logout, and shared views
     ├── HodViews.py                   # HOD workflows
+    ├── ProfileViews.py               # Role-scoped profile photo and directory views
     ├── StaffViews.py                 # Staff workflows
     ├── StudentViews.py               # Student workflows
+    ├── validators.py                 # Profile photo content and size validation
     ├── EmailBackEnd.py               # Email-based authentication
     ├── LoginCheckMiddleWare.py       # Role-aware view routing
+    ├── utils.py                      # Shared request-data validation helpers
     ├── migrations/
     ├── templates/
     │   ├── hod_template/
     │   ├── staff_template/
-    │   └── student_template/
+    │   ├── student_template/
+    │   └── profiles/                 # Shared avatars and role-aware profile pages
     └── tests.py
 ```
 
@@ -181,7 +193,7 @@ The requirements file includes `mysql-connector-python`, but that package does n
 
 The schema is defined in `student_management_app/models.py` and evolved through the app's migrations:
 
-- `CustomUser` extends Django's `AbstractUser` with a role value; `AdminHOD`, `Staffs`, and `Students` hold one-to-one role profiles.
+- `CustomUser` extends Django's `AbstractUser` with a role value and optional profile photo; `AdminHOD`, `Staffs`, and `Students` hold one-to-one role profiles.
 - `Courses` connect to `Subjects` and `Students`. A subject references its course and assigned user.
 - `SessionYearModel` stores academic session names and date boundaries. Students and attendance records reference a session.
 - `Attendance` records a subject, session, and date. `AttendanceReport` links a student to an attendance record with a present/absent status.
@@ -279,6 +291,31 @@ for /f %i in ('python -c "from django.core.management.utils import get_random_se
 export DJANGO_SECRET_KEY="$(python -c 'from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())')"
 ```
 
+For local development, set `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS` in the same terminal session. Keep `DEBUG` disabled outside a local development environment.
+
+**Windows PowerShell**
+
+```powershell
+$env:DJANGO_DEBUG = "true"
+$env:DJANGO_ALLOWED_HOSTS = "127.0.0.1,localhost"
+```
+
+**Windows Command Prompt (CMD)**
+
+```bat
+set "DJANGO_DEBUG=true"
+set "DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost"
+```
+
+**macOS / Linux**
+
+```bash
+export DJANGO_DEBUG=true
+export DJANGO_ALLOWED_HOSTS=127.0.0.1,localhost
+```
+
+`DJANGO_DEBUG` accepts `true` or `false` (also `1`/`0`, `yes`/`no`, and `on`/`off`) and defaults to `false`. `DJANGO_ALLOWED_HOSTS` is a comma-separated list of exact hostnames; it defaults to an empty list and rejects `*`. For a deployed site, provide its actual hostnames rather than the local examples above.
+
 ### Configure the database and apply migrations
 
 The project is configured to use SQLite at `db.sqlite3` in the project root. No database server or additional credentials are required for local development. Apply Django's built-in and application migrations:
@@ -307,9 +344,13 @@ Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in your browser. The appli
 
 ## Environment configuration
 
-The application reads `DJANGO_SECRET_KEY` from the process environment. `DEBUG`, `ALLOWED_HOSTS`, and the SQLite database path are configured in `student_management_system/settings.py`.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DJANGO_SECRET_KEY` | Yes | Django signing key; the application refuses to start when it is missing or blank. |
+| `DJANGO_DEBUG` | No | Enables debug mode only when explicitly set to a true value; defaults to `false`. |
+| `DJANGO_ALLOWED_HOSTS` | No | Comma-separated hostnames; defaults to an empty list. A wildcard (`*`) is rejected. |
 
-There is no `.env` loader, so a `.env` file will not configure the application and no `.env.example` is provided. The commands above set the key only for the current terminal session. Never put real passwords, keys, or credentials in README files or commit `.env` files.
+The database path is configured in `student_management_system/settings.py`; it is not an environment variable. There is no `.env` loader, so a `.env` file will not configure the application and no `.env.example` is provided. The commands above set variables only for the current terminal session. Never put real passwords, keys, or credentials in README files or commit `.env` files.
 
 ## Authentication and demo accounts
 
@@ -325,7 +366,17 @@ Run the app's Django tests with:
 python manage.py test student_management_app
 ```
 
-The current test module covers academic session APIs and attendance/session date behavior.
+The test module covers role dashboards and access, profile photo upload/replacement/removal and validation, staff/student profile visibility, login, student search, result visibility and ownership, CSRF enforcement, attendance ownership and updates, academic session APIs, and session-date validation. You can also run Django's configuration check:
+
+```bash
+python manage.py check
+```
+
+To confirm that model changes have corresponding migrations without creating files:
+
+```bash
+python manage.py makemigrations --check --dry-run
+```
 
 ## Roadmap
 
@@ -338,6 +389,7 @@ The current test module covers academic session APIs and attendance/session date
 - Leave requests and HOD approval/rejection.
 - Feedback submission and HOD replies.
 - Email-based login and role-specific application routing.
+- Validated profile photos, role-scoped profile access, staff access limited to assigned courses, and an HOD profile directory.
 
 ### Potential future improvements
 
@@ -350,15 +402,24 @@ These are ideas for future work, not features currently provided:
 - Broader API coverage for application workflows; a session-year JSON API already exists.
 - More granular role permissions and authorization tests.
 
+## Project documentation and maintenance
+
+- [Contribution guide](CONTRIBUTING.md): development checks and pull request workflow.
+- [Changelog](CHANGELOG.md): changes that are not yet part of a formal release.
+- [Maintenance and project provenance](docs/MAINTENANCE.md): original components,
+  maintainer contributions, legal attribution, and ongoing responsibilities.
+
 ## Security and best practices
 
-This project is configured for local development and is not production-hardened. In `student_management_system/settings.py`, `DEBUG` is enabled and `ALLOWED_HOSTS` is empty. An older version of this checkout contained a development key in Git history; treat that key as compromised and rotate it. The new GitHub snapshot will use a fresh initial commit without the existing Git history.
+This project is intended for local development and is not production-hardened. `DEBUG` defaults to `false`; set `DJANGO_DEBUG=true` only for local development. `ALLOWED_HOSTS` is read from `DJANGO_ALLOWED_HOSTS`, defaults to an empty list, and rejects an unrestricted wildcard. An older version of this checkout contained a development key in Git history; treat that key as compromised and rotate it. The published GitHub snapshot uses a fresh initial commit without the existing Git history.
 
 - Never commit `.env` files, passwords, API keys, or other secrets.
 - Keep `SECRET_KEY` private; load a new production key from secure configuration.
-- Set `DEBUG=False` in production.
-- Set `ALLOWED_HOSTS` to the exact hostnames used by the deployment; do not use an unrestricted wildcard.
+- Keep `DJANGO_DEBUG` unset or set it to `false` in production.
+- Set `DJANGO_ALLOWED_HOSTS` to the exact hostnames used by the deployment; do not use an unrestricted wildcard.
+- Profile photos are stored beneath `MEDIA_ROOT/profile_photos/` and delivered through role-checked views. Do not configure a production web server or object-storage bucket to serve that subdirectory directly; doing so bypasses application permissions.
 - Use strong, unique passwords for HOD, staff, and student accounts. Do not publish working credentials.
+- Django's CSRF middleware is enabled, and the application's AJAX POST workflows include CSRF tokens.
 - Use HTTPS and configure secure cookies and other Django deployment settings for the hosting environment.
 - Run the Django deployment checks and review the official [Django deployment checklist](https://docs.djangoproject.com/en/6.1/howto/deployment/checklist/) before going live.
 
@@ -366,37 +427,20 @@ These are recommendations, not a claim that all production security controls are
 
 ## Contributing
 
-Contributions and focused improvements are welcome. Before opening a pull request:
-
-1. Fork the repository on GitHub.
-2. Clone your fork and create a feature branch:
-
-   ```bash
-   git clone https://github.com/YOUR-USERNAME/student-management-system.git
-   cd student-management-system
-   git checkout -b feat/short-description
-   ```
-
-3. Make a focused change and add or update tests when behavior changes.
-4. Run the relevant tests:
-
-   ```bash
-   python manage.py test student_management_app
-   ```
-
-5. Replace the sample username and file path below with your GitHub username and the files you changed, then commit and push:
-
-   ```bash
-   git add path/to/changed-file
-   git commit -m "Describe your change"
-   git push -u origin feat/short-description
-   ```
-
-6. Open a pull request from your branch to the project's repository. Include a clear summary and test results, and do not include credentials or real student data.
+Contributions and focused improvements are welcome. Follow the
+[contribution guide](CONTRIBUTING.md) for branch, testing, migration, and pull
+request expectations. Do not include credentials, local database files,
+uploaded media, or real student data in a contribution.
 
 ## License
 
 Licensing information has not yet been specified. No root-level `LICENSE` file was present when this README was updated; do not assume a license is granted.
+
+This repository is based on the [original Django Student Management System by Vijay Thapa](https://github.com/vijaythapa333/django-student-management-system). This attribution does not claim or grant any license or additional permission.
+
+The repository also contains third-party assets with their own license or
+notice files. Retain those files and the application credits when modifying or
+redistributing the bundled assets.
 
 ## Author
 

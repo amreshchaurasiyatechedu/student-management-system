@@ -1,17 +1,20 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect, JsonResponse
 from django.contrib import messages
 from django.core.files.storage import FileSystemStorage #To upload Profile Picture
 from django.urls import reverse
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 import datetime
 from django.core import serializers
+from decimal import Decimal, InvalidOperation
 import json
+import math
 
 
 from student_management_app.models import CustomUser, Staffs, Courses, Subjects, Students, SessionYearModel, Attendance, AttendanceReport, LeaveReportStaff, FeedBackStaffs, StudentResult
+from .utils import _positive_id
 
 
 def staff_home(request):
@@ -138,41 +141,35 @@ def staff_feedback_save(request):
             return redirect('staff_feedback')
 
 
-# WE don't need csrf_token when using Ajax
-@csrf_exempt
+@require_POST
 def get_students(request):
-    # Getting Values from Ajax POST 'Fetch Student'
-    subject_id = request.POST.get("subject")
-    session_year = request.POST.get("session_year")
+    subject_id = _positive_id(request.POST.get("subject"))
+    session_year_id = _positive_id(request.POST.get("session_year"))
+    if subject_id is None or session_year_id is None:
+        return HttpResponseBadRequest("Select a valid subject and session.")
 
-    # Students enroll to Course, Course has Subjects
-    # Getting all data from subject model based on subject_id
-    subject_model = Subjects.objects.get(id=subject_id)
-
-    session_model = SessionYearModel.objects.get(id=session_year)
-
-    students = Students.objects.filter(course_id=subject_model.course_id, session_year_id=session_model)
-
-    # Only Passing Student Id and Student Name Only
-    list_data = []
-
-    for student in students:
-        data_small={"id":student.admin.id, "name":student.admin.first_name+" "+student.admin.last_name}
-        list_data.append(data_small)
-
-    return JsonResponse(json.dumps(list_data), content_type="application/json", safe=False)
-
+    subject = get_object_or_404(Subjects, id=subject_id, staff_id=request.user.id)
+    session_year = get_object_or_404(SessionYearModel, id=session_year_id)
+    students = Students.objects.filter(
+        course_id=subject.course_id,
+        session_year_id=session_year,
+    ).select_related("admin")
+    list_data = [
+        {
+            "id": student.admin_id,
+            "name": f"{student.admin.first_name} {student.admin.last_name}".strip(),
+        }
+        for student in students
+    ]
+    return JsonResponse(list_data, safe=False)
 
 
-
-@csrf_exempt
+@require_POST
 def save_attendance_data(request):
-    # Get Values from Staf Take Attendance form via AJAX (JavaScript)
-    # Use getlist to access HTML Array/List Input Data
     student_ids = request.POST.get("student_ids")
-    subject_id = request.POST.get("subject_id")
+    subject_id = _positive_id(request.POST.get("subject_id"))
     attendance_date = request.POST.get("attendance_date")
-    session_year_id = request.POST.get("session_year_id")
+    session_year_id = _positive_id(request.POST.get("session_year_id"))
 
     if not all((student_ids, subject_id, attendance_date, session_year_id)):
         return HttpResponse("Missing attendance data.", status=400)
@@ -186,20 +183,22 @@ def save_attendance_data(request):
     session_year_model = get_object_or_404(SessionYearModel, id=session_year_id)
     if not session_year_model.session_start_year <= attendance_day <= session_year_model.session_end_year:
         return HttpResponse("Attendance date must be within the selected session.", status=400)
-    if not isinstance(json_student, list) or any(
-        not isinstance(student_data, dict)
-        or "id" not in student_data
-        or student_data.get("status") not in (0, 1, False, True)
-        for student_data in json_student
-    ):
+    if not isinstance(json_student, list):
         return HttpResponse("Invalid student data.", status=400)
     if not json_student:
         return HttpResponse("Select at least one student for attendance.", status=400)
 
-    try:
-        student_admin_ids = [int(student_data["id"]) for student_data in json_student]
-    except (TypeError, ValueError):
-        return HttpResponse("Invalid student data.", status=400)
+    normalized_students = []
+    for student_data in json_student:
+        if not isinstance(student_data, dict):
+            return HttpResponse("Invalid student data.", status=400)
+        student_admin_id = _positive_id(student_data.get("id"))
+        status = student_data.get("status")
+        if student_admin_id is None or not isinstance(status, (int, bool)) or status not in (0, 1):
+            return HttpResponse("Invalid student data.", status=400)
+        normalized_students.append((student_admin_id, bool(status)))
+
+    student_admin_ids = [student_id for student_id, _ in normalized_students]
     if len(student_admin_ids) != len(set(student_admin_ids)):
         return HttpResponse("Student list contains duplicates.", status=400)
 
@@ -208,8 +207,8 @@ def save_attendance_data(request):
         course_id=subject_model.course_id,
         session_year_id=session_year_model,
     )
-    students_by_admin_id = {str(student.admin_id): student for student in students}
-    if len(students_by_admin_id) != len(json_student):
+    students_by_admin_id = {student.admin_id: student for student in students}
+    if len(students_by_admin_id) != len(normalized_students):
         return HttpResponse("Student list does not match the selected subject and session.", status=400)
 
     with transaction.atomic():
@@ -220,15 +219,13 @@ def save_attendance_data(request):
         )
         AttendanceReport.objects.bulk_create([
             AttendanceReport(
-                student_id=students_by_admin_id[str(student_admin_id)],
+                student_id=students_by_admin_id[student_admin_id],
                 attendance_id=attendance,
-                status=bool(student_data["status"]),
+                status=status,
             )
-            for student_admin_id, student_data in zip(student_admin_ids, json_student)
+            for student_admin_id, status in normalized_students
         ])
     return HttpResponse("OK")
-
-
 
 
 def staff_update_attendance(request):
@@ -240,74 +237,101 @@ def staff_update_attendance(request):
     }
     return render(request, "staff_template/update_attendance_template.html", context)
 
-@csrf_exempt
+
+@require_POST
 def get_attendance_dates(request):
-    
+    subject_id = _positive_id(request.POST.get("subject"))
+    session_year_id = _positive_id(request.POST.get("session_year_id"))
+    if subject_id is None or session_year_id is None:
+        return HttpResponseBadRequest("Select a valid subject and session.")
 
-    # Getting Values from Ajax POST 'Fetch Student'
-    subject_id = request.POST.get("subject")
-    session_year = request.POST.get("session_year_id")
-
-    # Students enroll to Course, Course has Subjects
-    # Getting all data from subject model based on subject_id
-    subject_model = get_object_or_404(Subjects, id=subject_id, staff_id=request.user.id)
-    session_model = get_object_or_404(SessionYearModel, id=session_year)
-
+    subject = get_object_or_404(Subjects, id=subject_id, staff_id=request.user.id)
+    session_year = get_object_or_404(SessionYearModel, id=session_year_id)
     attendance = Attendance.objects.filter(
-        subject_id=subject_model,
-        session_year_id=session_model,
-        attendance_date__range=(session_model.session_start_year, session_model.session_end_year),
+        subject_id=subject,
+        session_year_id=session_year,
+        attendance_date__range=(session_year.session_start_year, session_year.session_end_year),
     ).order_by("attendance_date")
-
-    # Only Passing Student Id and Student Name Only
-    list_data = []
-
-    for attendance_single in attendance:
-        data_small={"id":attendance_single.id, "attendance_date":str(attendance_single.attendance_date), "session_year_id":attendance_single.session_year_id.id}
-        list_data.append(data_small)
-
+    list_data = [
+        {
+            "id": record.id,
+            "attendance_date": str(record.attendance_date),
+            "session_year_id": record.session_year_id_id,
+        }
+        for record in attendance
+    ]
     return JsonResponse(list_data, safe=False)
 
 
-@csrf_exempt
+@require_POST
 def get_attendance_student(request):
-    # Getting Values from Ajax POST 'Fetch Student'
-    attendance_date = request.POST.get('attendance_date')
-    attendance = Attendance.objects.get(id=attendance_date)
+    attendance_id = _positive_id(request.POST.get("attendance_date"))
+    if attendance_id is None:
+        return HttpResponseBadRequest("Select a valid attendance record.")
 
-    attendance_data = AttendanceReport.objects.filter(attendance_id=attendance)
-    # Only Passing Student Id and Student Name Only
-    list_data = []
+    attendance = get_object_or_404(
+        Attendance.objects.select_related("subject_id"),
+        id=attendance_id,
+        subject_id__staff_id=request.user.id,
+    )
+    attendance_reports = AttendanceReport.objects.filter(
+        attendance_id=attendance,
+    ).select_related("student_id__admin")
+    list_data = [
+        {
+            "id": report.student_id.admin_id,
+            "name": f"{report.student_id.admin.first_name} {report.student_id.admin.last_name}".strip(),
+            "status": report.status,
+        }
+        for report in attendance_reports
+    ]
+    return JsonResponse(list_data, safe=False)
 
-    for student in attendance_data:
-        data_small={"id":student.student_id.admin.id, "name":student.student_id.admin.first_name+" "+student.student_id.admin.last_name, "status":student.status}
-        list_data.append(data_small)
 
-    return JsonResponse(json.dumps(list_data), content_type="application/json", safe=False)
-
-
-@csrf_exempt
+@require_POST
 def update_attendance_data(request):
     student_ids = request.POST.get("student_ids")
-
-    attendance_date = request.POST.get("attendance_date")
-    attendance = Attendance.objects.get(id=attendance_date)
-
-    json_student = json.loads(student_ids)
-
+    attendance_id = _positive_id(request.POST.get("attendance_date"))
+    if not student_ids or attendance_id is None:
+        return HttpResponseBadRequest("Attendance data is required.")
     try:
-        
-        for stud in json_student:
-            # Attendance of Individual Student saved on AttendanceReport Model
-            student = Students.objects.get(admin=stud['id'])
+        submitted_students = json.loads(student_ids)
+    except (TypeError, ValueError, json.JSONDecodeError):
+        return HttpResponse("Invalid student data.", status=400)
+    if not isinstance(submitted_students, list) or not submitted_students:
+        return HttpResponseBadRequest("Select at least one student.")
 
-            attendance_report = AttendanceReport.objects.get(student_id=student, attendance_id=attendance)
-            attendance_report.status=stud['status']
+    normalized_students = {}
+    for student_data in submitted_students:
+        if not isinstance(student_data, dict):
+            return HttpResponseBadRequest("Invalid student data.")
+        student_id = _positive_id(student_data.get("id"))
+        status = student_data.get("status")
+        if student_id is None or not isinstance(status, (int, bool)) or status not in (0, 1):
+            return HttpResponseBadRequest("Invalid student data.")
+        if student_id in normalized_students:
+            return HttpResponseBadRequest("Student list contains duplicates.")
+        normalized_students[student_id] = bool(status)
 
-            attendance_report.save()
-        return HttpResponse("OK")
-    except:
-        return HttpResponse("Error")
+    attendance = get_object_or_404(
+        Attendance,
+        id=attendance_id,
+        subject_id__staff_id=request.user.id,
+    )
+    reports = list(
+        AttendanceReport.objects.filter(
+            attendance_id=attendance,
+            student_id__admin_id__in=normalized_students,
+        ).select_related("student_id")
+    )
+    if len(reports) != len(normalized_students):
+        return HttpResponseBadRequest("Student list does not match this attendance record.")
+
+    with transaction.atomic():
+        for report in reports:
+            report.status = normalized_students[report.student_id.admin_id]
+            report.save(update_fields=["status", "updated_at"])
+    return HttpResponse("OK")
 
 
 def staff_profile(request):
@@ -361,34 +385,57 @@ def staff_add_result(request):
     return render(request, "staff_template/add_result_template.html", context)
 
 
+@require_POST
 def staff_add_result_save(request):
-    if request.method != "POST":
-        messages.error(request, "Invalid Method")
-        return redirect('staff_add_result')
-    else:
-        student_admin_id = request.POST.get('student_list')
-        assignment_marks = request.POST.get('assignment_marks')
-        exam_marks = request.POST.get('exam_marks')
-        subject_id = request.POST.get('subject')
+    student_admin_id = _positive_id(request.POST.get("student_list"))
+    subject_id = _positive_id(request.POST.get("subject"))
+    session_year_id = _positive_id(request.POST.get("session_year"))
+    try:
+        assignment_marks = Decimal(request.POST.get("assignment_marks", "").strip())
+        exam_marks = Decimal(request.POST.get("exam_marks", "").strip())
+    except (InvalidOperation, AttributeError):
+        messages.error(request, "Enter valid numeric marks.")
+        return redirect("staff_add_result")
 
-        student_obj = Students.objects.get(admin=student_admin_id)
-        subject_obj = Subjects.objects.get(id=subject_id)
+    if (
+        student_admin_id is None
+        or subject_id is None
+        or session_year_id is None
+        or not assignment_marks.is_finite()
+        or not exam_marks.is_finite()
+        or assignment_marks < 0
+        or exam_marks < 0
+    ):
+        messages.error(request, "Enter valid non-negative marks and select a student, subject, and session.")
+        return redirect("staff_add_result")
+    assignment_value = float(assignment_marks)
+    exam_value = float(exam_marks)
+    if not math.isfinite(assignment_value) or not math.isfinite(exam_value):
+        messages.error(request, "Marks are outside the supported numeric range.")
+        return redirect("staff_add_result")
 
-        try:
-            # Check if Students Result Already Exists or not
-            check_exist = StudentResult.objects.filter(subject_id=subject_obj, student_id=student_obj).exists()
-            if check_exist:
-                result = StudentResult.objects.get(subject_id=subject_obj, student_id=student_obj)
-                result.subject_assignment_marks = assignment_marks
-                result.subject_exam_marks = exam_marks
-                result.save()
-                messages.success(request, "Result Updated Successfully!")
-                return redirect('staff_add_result')
-            else:
-                result = StudentResult(student_id=student_obj, subject_id=subject_obj, subject_exam_marks=exam_marks, subject_assignment_marks=assignment_marks)
-                result.save()
-                messages.success(request, "Result Added Successfully!")
-                return redirect('staff_add_result')
-        except:
-            messages.error(request, "Failed to Add Result!")
-            return redirect('staff_add_result')
+    subject = get_object_or_404(
+        Subjects,
+        id=subject_id,
+        staff_id=request.user.id,
+    )
+    session_year = get_object_or_404(SessionYearModel, id=session_year_id)
+    student = get_object_or_404(
+        Students,
+        admin_id=student_admin_id,
+        course_id=subject.course_id,
+        session_year_id=session_year,
+    )
+    result, created = StudentResult.objects.update_or_create(
+        subject_id=subject,
+        student_id=student,
+        defaults={
+            "subject_assignment_marks": assignment_value,
+            "subject_exam_marks": exam_value,
+        },
+    )
+    messages.success(
+        request,
+        "Result Added Successfully!" if created else "Result Updated Successfully!",
+    )
+    return redirect("staff_add_result")

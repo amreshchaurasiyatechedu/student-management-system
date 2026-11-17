@@ -123,7 +123,7 @@
                 $.ajax({
                     url:'{% url 'staff_feedback_message_reply' %}',
                     type:'POST',
-                    data:{id:id, reply:reply},
+                    data:{id:id, reply:reply, csrfmiddlewaretoken:"{{ csrf_token }}"},
                 })
 
                 

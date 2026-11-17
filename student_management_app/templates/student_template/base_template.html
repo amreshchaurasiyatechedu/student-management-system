@@ -1,13 +1,14 @@
 {% load static %}
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <title>Student Dashboard | Student Management System | Amresh Chaurasiya</title>
+  <title>Student | Amresh Student Management System</title>
   <!-- Tell the browser to be responsive to screen width -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#14243a">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="{% static "fontawesome-free/css/all.min.css" %}">
   <!-- Ionicons -->
@@ -28,6 +29,7 @@
   <link rel="stylesheet" href="{% static "summernote/summernote-bs4.css" %}">
   <!-- Google Font: Source Sans Pro -->
   <link href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/brand.css' %}">
 
     {% comment %} For Custom CSS {% endcomment %}
 
@@ -36,7 +38,7 @@
 
 </head>
 
-<body class="hold-transition sidebar-mini layout-fixed">
+<body class="hold-transition sidebar-mini layout-fixed app-shell">
   <div class="wrapper">
 
   <!-- Navbar -->
@@ -44,11 +46,15 @@
       <!-- Left navbar links -->
       <ul class="navbar-nav">
         <li class="nav-item">
-          <a class="nav-link" data-widget="pushmenu" href="#" role="button"><i class="fas fa-bars"></i></a>
+          <a class="nav-link" data-widget="pushmenu" href="#" role="button" aria-label="Toggle navigation"><i class="fas fa-bars" aria-hidden="true"></i></a>
         </li>
       </ul>
 
-      <h4 style="margin-left: 10px; margin-top: 5px;">Student Management System | Student Dashboard</h4>
+      <a class="navbar-branding" href="{% url 'student_home' %}">
+        <span class="brand-mark" aria-hidden="true"><i class="fas fa-graduation-cap"></i></span>
+        <span class="app-name">Amresh Student Management System</span>
+      </a>
+      <span class="app-role-label">Student</span>
 
       <ul class="navbar-nav ml-auto">
       
@@ -59,10 +65,15 @@
         </a>
         <div class="dropdown-menu dropdown-menu-lg dropdown-menu-right" style="left: inherit; right: 0px;">
           
+          <a href="{% url 'my_profile' %}" class="dropdown-item">
+            <i class="fas fa-user mr-2"></i> My Profile
+          </a>
           <a href="{% url 'student_profile' %}" class="dropdown-item">
             <i class="fas fa-user-edit mr-2"></i> Update Profile
           </a>
-
+          <a href="{% url 'about' %}" class="dropdown-item">
+            <i class="fas fa-info-circle mr-2"></i> About this system
+          </a>
           <div class="dropdown-divider"></div>
           <a href="{% url 'logout_user' %}" class="dropdown-item">
             <i class="fas fa-power-off mr-2"></i> Logout
@@ -126,8 +137,6 @@
 <script src="{% static "bootstrap/js/bootstrap.bundle.min.js"  %}"></script>
 <!-- ChartJS -->
 <script src="{% static "chart.js/Chart.min.js"  %}"></script>
-<!-- Sparkline -->
-<script src="{% static "sparklines/sparkline.js"  %}"></script>
 <!-- JQVMap -->
 <script src="{% static "jqvmap/jquery.vmap.min.js"  %}"></script>
 <script src="{% static "jqvmap/maps/jquery.vmap.usa.js"  %}"></script>
@@ -144,11 +153,6 @@
 <script src="{% static "overlayScrollbars/js/jquery.overlayScrollbars.min.js"  %}"></script>
 <!-- AdminLTE App -->
 <script src="{% static 'dist/js/adminlte.js'  %}"></script>
-<!-- AdminLTE dashboard demo (This is only for demo purposes) -->
-<script src="{% static 'dist/js/pages/dashboard.js'  %}"></script>
-<!-- AdminLTE for demo purposes -->
-<script src="{% static 'dist/js/demo.js'  %}"></script>
-
 {% comment %} For Custom JS {% endcomment %}
 {% block custom_js %}
 {% endblock custom_js %}

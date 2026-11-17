@@ -107,39 +107,61 @@
             $.ajax({
                 url:'{% url 'get_students' %}',
                 type:'POST',
-                data:{subject:subject, session_year:session_year},
+                data:{subject:subject, session_year:session_year, csrfmiddlewaretoken:"{{ csrf_token }}"},
             })
 
             
             .done(function(response){
-                var json_data=JSON.parse(response);
-                console.log(json_data)
+                var json_data=response;
                 //Displaying Attendance Date Input and Students Attendance
-                var div_data="<div class='form-group'><label>Student List</label> <select class='student_list form-control' name='student_list'>"
+                var $studentData = $("<div>");
+                var $studentSelect = $("<select>", {
+                    class: "student_list form-control",
+                    name: "student_list"
+                });
+                json_data.forEach(function(student) {
+                    $studentSelect.append(
+                        $("<option>", {
+                            value: student.id,
+                            text: "ID: " + student.id + " : " + student.name
+                        })
+                    );
+                });
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<label>").text("Student List"))
+                        .append($studentSelect)
+                );
 
-                for(key in json_data)
-                {
-                    div_data+="<option value='"+ json_data[key]['id'] +"'>ID: "+ json_data[key]['id'] +" : "+ json_data[key]['name'] +"</option>";
-
-                }
-                div_data+="</select>";
-                div_data+="</div>";
-                div_data+="<div class='form-group'><div class='row'>";
-
-                div_data+="<div class='col-lg-6'>";
-                div_data+="<label>Assignment Marks : </label><input type='text'name='assignment_marks' class='form-control' placeholder='Assignment Marks' />";
-                div_data+="</div>";
-
-                div_data+="<div class='col-lg-6'>";
-                div_data+="<label>Exam Marks : </label><input type='text'name='exam_marks' class='form-control' placeholder='Exam Marks' />";
-                div_data+="</div>";
-
-                div_data+="</div></div>";
-
-                div_data+="<div class='form-group'>";
-                div_data+="<button id='save_attendance' class='btn btn-success' type='submit'>Save Result</button>";
-                div_data+="</div>";
-                $("#student_data").html(div_data);
+                var $marksRow = $("<div>").addClass("form-group row");
+                [
+                    ["Assignment Marks", "assignment_marks"],
+                    ["Exam Marks", "exam_marks"]
+                ].forEach(function(field) {
+                    var $input = $("<input>", {
+                        type: "number",
+                        name: field[1],
+                        placeholder: field[0],
+                        min: 0,
+                        step: "any"
+                    }).addClass("form-control");
+                    $marksRow.append(
+                        $("<div>").addClass("col-lg-6")
+                            .append($("<label>").text(field[0] + " : "))
+                            .append($input)
+                    );
+                });
+                $studentData.append($marksRow);
+                $studentData.append(
+                    $("<div>").addClass("form-group")
+                        .append($("<button>", {
+                            id: "save_attendance",
+                            class: "btn btn-success",
+                            type: "submit",
+                            text: "Save Result"
+                        }))
+                );
+                $("#student_data").empty().append($studentData.children());
 
             })
             .fail(function(){

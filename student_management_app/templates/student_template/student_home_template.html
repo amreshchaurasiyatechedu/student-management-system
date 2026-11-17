@@ -11,6 +11,14 @@
 <section class="content">
         <div class="container-fluid">
 
+            <div class="app-welcome">
+                <div>
+                    <h2>Welcome back, {{ user.first_name|default:"there" }}</h2>
+                    <p>Keep track of your attendance, subjects, and academic progress.</p>
+                </div>
+                <span class="app-welcome-icon" aria-hidden="true"><i class="fas fa-user-graduate"></i></span>
+            </div>
+
             {% comment %} Boxes Section Starts {% endcomment %}
             <div class="row">
                 <div class="col-lg-3 col-6">

@@ -15,7 +15,11 @@ class LoginCheckMiddleWare(MiddlewareMixin):
             if user.user_type == "1":
                 if modulename == "student_management_app.HodViews":
                     pass
-                elif modulename == "student_management_app.views" or modulename == "django.views.static":
+                elif modulename in {
+                    "student_management_app.views",
+                    "student_management_app.ProfileViews",
+                    "django.views.static",
+                }:
                     pass
                 else:
                     return redirect("admin_home")
@@ -23,7 +27,11 @@ class LoginCheckMiddleWare(MiddlewareMixin):
             elif user.user_type == "2":
                 if modulename == "student_management_app.StaffViews":
                     pass
-                elif modulename == "student_management_app.views" or modulename == "django.views.static":
+                elif modulename in {
+                    "student_management_app.views",
+                    "student_management_app.ProfileViews",
+                    "django.views.static",
+                }:
                     pass
                 else:
                     return redirect("staff_home")
@@ -31,7 +39,11 @@ class LoginCheckMiddleWare(MiddlewareMixin):
             elif user.user_type == "3":
                 if modulename == "student_management_app.StudentViews":
                     pass
-                elif modulename == "student_management_app.views" or modulename == "django.views.static":
+                elif modulename in {
+                    "student_management_app.views",
+                    "student_management_app.ProfileViews",
+                    "django.views.static",
+                }:
                     pass
                 else:
                     return redirect("student_home")
@@ -40,7 +52,11 @@ class LoginCheckMiddleWare(MiddlewareMixin):
                 return redirect("login")
 
         else:
-            if request.path == reverse("login") or request.path == reverse("doLogin"):
+            if request.path in {
+                reverse("login"),
+                reverse("doLogin"),
+                reverse("about"),
+            }:
                 pass
             else:
                 return redirect("login")

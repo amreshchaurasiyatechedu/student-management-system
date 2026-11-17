@@ -1,0 +1,82 @@
+{% extends base_template %}
+
+{% block page_title %}My profile{% endblock page_title %}
+
+{% block main_content %}
+<section class="content">
+  <div class="container-fluid">
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-{{ message.tags|default:'info' }}{% endif %}" role="status">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="row">
+      <div class="col-lg-5">
+        <div class="card profile-card">
+          <div class="card-body text-center">
+            {% include "profiles/avatar.html" with avatar_user=profile_user avatar_class="profile-avatar-large" %}
+            <h2 class="h4 mt-3 mb-1">{{ profile_user.get_full_name|default:profile_user.username }}</h2>
+            <p class="text-muted mb-0">{{ role_label }}</p>
+            <p class="text-muted">{{ profile_user.email }}</p>
+          </div>
+        </div>
+
+        {% include "profiles/photo_form.html" with photo_form=photo_form profile_user=profile_user %}
+      </div>
+
+      <div class="col-lg-7">
+        <div class="card profile-card">
+          <div class="card-header">
+            <h2 class="card-title">Profile information</h2>
+          </div>
+          <div class="card-body">
+            <dl class="profile-details">
+              <dt>Name</dt>
+              <dd>{{ profile_user.get_full_name|default:profile_user.username }}</dd>
+              <dt>Username</dt>
+              <dd>{{ profile_user.username }}</dd>
+              <dt>Email</dt>
+              <dd>{{ profile_user.email|default:"Not provided" }}</dd>
+              <dt>Role</dt>
+              <dd>{{ role_label }}</dd>
+              {% if student %}
+                <dt>Student ID</dt>
+                <dd>{{ student.pk }}</dd>
+                <dt>Course / class</dt>
+                <dd>{{ student.course_id.course_name }}</dd>
+                <dt>Academic session</dt>
+                <dd>{{ student.session_year_id.display_name }}</dd>
+                <dt>Address</dt>
+                <dd>{{ student.address|default:"Not provided" }}</dd>
+              {% elif staff %}
+                <dt>Staff ID</dt>
+                <dd>{{ staff.pk }}</dd>
+                <dt>Address</dt>
+                <dd>{{ staff.address|default:"Not provided" }}</dd>
+                <dt>Assigned subjects</dt>
+                <dd>
+                  {% for subject in subjects %}
+                    <span class="badge badge-light mr-1">{{ subject.subject_name }} · {{ subject.course_id.course_name }}</span>
+                  {% empty %}
+                    No subjects assigned
+                  {% endfor %}
+                </dd>
+              {% endif %}
+            </dl>
+          </div>
+          <div class="card-footer">
+            {% if profile_user.user_type == "1" %}
+              <a class="btn btn-outline-primary" href="{% url 'admin_profile' %}">Edit account details</a>
+            {% elif profile_user.user_type == "2" %}
+              <a class="btn btn-outline-primary" href="{% url 'staff_profile' %}">Edit account details</a>
+            {% elif profile_user.user_type == "3" %}
+              <a class="btn btn-outline-primary" href="{% url 'student_profile' %}">Edit account details</a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock main_content %}

@@ -160,6 +160,8 @@
 
 <script>
     $(document).ready(function(){
+        var csrfToken = $("#addSessionForm [name=csrfmiddlewaretoken]").val();
+
         function showSessionError(message) {
             $("#sessionFormError").removeClass("d-none").text(message);
         }
@@ -254,6 +256,7 @@
                     url:'{% url 'admin_get_attendance_dates' %}',
                     type:'POST',
                     data:{subject:subject, session_year_id:session_year_id},
+                    headers: {"X-CSRFToken": csrfToken},
                 })
 
                 
@@ -287,9 +290,11 @@
                     
                 })
 
-                .fail(function(){
-                    alert("Error in getting Attendance Dates.")
-                    $("#error_attendance").html("");
+                .fail(function(xhr){
+                    var message = xhr.responseJSON && xhr.responseJSON.error
+                        ? xhr.responseJSON.error
+                        : "Unable to load attendance dates.";
+                    $("#error_attendance").text(message).show();
                     $("#fetch_student_block").hide();
                     $("#attendance_block").hide();
                 }).always(function(){
@@ -316,44 +321,38 @@
                 url:'{% url 'admin_get_attendance_student' %}',
                 type:'POST',
                 data:{attendance_date:attendance_date},
+                headers: {"X-CSRFToken": csrfToken},
             })
 
             
-            .done(function(response){
-                var json_data=JSON.parse(response);
-                //console.log(json_data)
-                //Displaying Attendance Date Input and Students Attendance
-                var div_data="<div class='form-group'><label>Student Attendance: </label></div>"
-                div_data+="<div class='form-group'><div class='row'>"
+            .done(function(attendanceReports){
+                var $content = $("<div>").append(
+                    $("<div>", {class: "form-group"}).append(
+                        $("<label>").text("Student Attendance:")
+                    )
+                );
+                var $row = $("<div>", {class: "form-row"});
 
-                for(key in json_data)
-                {
-                    div_data+="<div class='col-lg-3'><div class='form-check'>";
+                $.each(attendanceReports, function(_, report) {
+                    var $student = $("<div>", {class: "col-lg-3 col-md-4 col-6 mb-2"});
+                    var $entry = $("<div>", {class: "form-check"});
+                    $("<span>").text(report.name).appendTo($entry);
+                    $("<strong>", {class: "ml-1"})
+                        .text(report.status ? "[ Present ]" : "[ Absent ]")
+                        .appendTo($entry);
+                    $student.append($entry).appendTo($row);
+                });
 
-                    div_data+="<label class='form-check-label'>"+ json_data[key]['name']+" </label> ";
-                    
-                    // Displaying Present and Absent
-
-                    if(json_data[key]['status'])
-                    {
-                        div_data+="<b>[ Present ]</b>";
-                    }
-                    else
-                    {
-                        div_data+="<b>[ Absent ]</b>";
-                    }
-                    //Displaying Present and Absent Ends Here
-                    
-
-                    div_data+="</div></div> ";
-                }
-                div_data+="</div></div>";
-                
-                $("#student_data").html(div_data);
+                $content.append($row);
+                $("#student_data").empty().append($content);
+                $("#error_attendance").hide().text("");
 
             })
-            .fail(function(){
-                alert("Error in Fetching Students.")
+            .fail(function(xhr){
+                var message = xhr.responseJSON && xhr.responseJSON.error
+                    ? xhr.responseJSON.error
+                    : "Unable to load attendance records.";
+                $("#error_attendance").text(message).show();
             })
 
 

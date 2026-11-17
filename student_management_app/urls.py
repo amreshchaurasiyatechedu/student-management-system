@@ -1,15 +1,21 @@
 
 from django.urls import path, include
 from . import views
-from .import HodViews, StaffViews, StudentViews
+from . import HodViews, ProfileViews, StaffViews, StudentViews
 
 
 urlpatterns = [
     path('', views.loginPage, name="login"),
+    path('about/', views.about, name="about"),
     # path('accounts/', include('django.contrib.auth.urls')),
     path('doLogin/', views.doLogin, name="doLogin"),
     path('get_user_details/', views.get_user_details, name="get_user_details"),
     path('logout_user/', views.logout_user, name="logout_user"),
+    path('my-profile/', ProfileViews.my_profile, name="my_profile"),
+    path('profiles/users/', ProfileViews.user_directory, name="user_directory"),
+    path('profiles/students/', ProfileViews.staff_student_directory, name="staff_student_directory"),
+    path('profiles/users/<int:user_id>/', ProfileViews.profile_detail, name="profile_detail"),
+    path('profile-photo/<int:user_id>/', ProfileViews.profile_photo, name="profile_photo"),
     path('admin_home/', HodViews.admin_home, name="admin_home"),
     path('add_staff/', HodViews.add_staff, name="add_staff"),
     path('add_staff_save/', HodViews.add_staff_save, name="add_staff_save"),
